@@ -31,7 +31,7 @@ export default function ChatInput({ onSendMessage, onTyping, onStopTyping }) {
       <textarea
         value={input}
         onChange={handleChange}
-        onKeyPress={handleKeyPress}
+        onKeyDown={handleKeyPress}
         onBlur={() => onStopTyping && onStopTyping()}
         placeholder="Type your message here..."
         className="chat-input"

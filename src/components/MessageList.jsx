@@ -19,7 +19,7 @@ export default function MessageList({ messages, currentUser, typing }) {
       ) : (
         messages.map((msg, index) => (
           <Message 
-            key={index} 
+            key={msg.id || `${msg.username || 'system'}-${msg.timestamp || index}`} 
             message={msg} 
             isUser={msg.username === currentUser}
             currentUser={currentUser}

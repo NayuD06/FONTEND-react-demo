@@ -9,6 +9,7 @@ import {
   removeUser,
   listenToUsers,
   addSystemMessage,
+  getFirebaseConfigError,
 } from '../services/firebaseService'
 import './Chat.css'
 
@@ -16,31 +17,81 @@ export default function Chat() {
   const [messages, setMessages] = useState([])
   const [users, setUsers] = useState([])
   const [username, setUsername] = useState('')
+  const [joinName, setJoinName] = useState('')
   const [isConnected, setIsConnected] = useState(false)
   const [typing, setTyping] = useState('')
+  const [error, setError] = useState('')
   const [currentUserId] = useState(`user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
+
+  const toFriendlyError = (err) => {
+    const message = err?.message || ''
+
+    if (message.includes('permission_denied')) {
+      return 'Firebase khong co quyen doc/ghi. Hay vao Realtime Database > Rules va cho phep read/write.'
+    }
+
+    if (message.includes('Cau hinh Firebase chua day du')) {
+      return message
+    }
+
+    return 'Khong the ket noi Firebase Realtime Database. Hay kiem tra lai DATABASE_URL va da tao database instance chua.'
+  }
 
   // Initialize Firebase listeners
   useEffect(() => {
     if (!username) return
 
+    const configError = getFirebaseConfigError()
+    if (configError) {
+      setError(configError)
+      setIsConnected(false)
+      return
+    }
+
+    let isMounted = true
+    setError('')
+    setIsConnected(false)
+
     // Add current user
-    addUser(username, currentUserId)
-    addSystemMessage(`${username} joined the chat`)
-    setIsConnected(true)
+    Promise.all([
+      addUser(username, currentUserId),
+      addSystemMessage(`${username} joined the chat`),
+    ])
+      .then(() => {
+        if (isMounted) {
+          setIsConnected(true)
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          setError(toFriendlyError(err))
+          setIsConnected(false)
+        }
+      })
 
     // Listen to messages
     const unsubscribeMessages = listenToMessages((msgs) => {
       setMessages(msgs)
+    }, (err) => {
+      if (isMounted) {
+        setError(toFriendlyError(err))
+        setIsConnected(false)
+      }
     })
 
     // Listen to users
     const unsubscribeUsers = listenToUsers((usersList) => {
       setUsers(usersList)
+    }, (err) => {
+      if (isMounted) {
+        setError(toFriendlyError(err))
+        setIsConnected(false)
+      }
     })
 
     // Cleanup
     return () => {
+      isMounted = false
       unsubscribeMessages()
       unsubscribeUsers()
       removeUser(currentUserId)
@@ -50,13 +101,19 @@ export default function Chat() {
 
   const handleJoin = (name) => {
     if (name.trim()) {
+      setError('')
       setUsername(name)
     }
   }
 
-  const handleSendMessage = (text) => {
+  const handleSendMessage = async (text) => {
     if (text.trim() && username) {
-      sendMessage(username, text)
+      try {
+        await sendMessage(username, text)
+      } catch (err) {
+        setError(toFriendlyError(err))
+        setIsConnected(false)
+      }
     }
   }
 
@@ -78,24 +135,26 @@ export default function Chat() {
           <input
             type="text"
             placeholder="Your name..."
-            onKeyPress={(e) => {
+            value={joinName}
+            onChange={(e) => setJoinName(e.target.value)}
+            onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                handleJoin(e.target.value)
-                e.target.value = ''
+                handleJoin(joinName)
+                setJoinName('')
               }
             }}
             className="username-input"
           />
           <button
-            onClick={(e) => {
-              const input = e.target.previousElementSibling
-              handleJoin(input.value)
-              input.value = ''
+            onClick={() => {
+              handleJoin(joinName)
+              setJoinName('')
             }}
             className="join-button"
           >
             Join Chat
           </button>
+          {error && <p className="status error">{error}</p>}
           <p className={`status ${isConnected ? 'connected' : 'connecting'}`}>
             {isConnected ? '🟢 Connected' : '🔴 Connecting...'}
           </p>
@@ -112,6 +171,7 @@ export default function Chat() {
           <div className="header-content">
             <h1>💬 Chat App</h1>
             <p>Users: {users.length}</p>
+            {error && <p className="header-error">{error}</p>}
           </div>
           <div className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}>
             {isConnected ? '🟢 Online' : '🔴 Offline'}

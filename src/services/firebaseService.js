@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { getDatabase, ref, push, set, onValue, remove, query, orderByChild, limitToLast } from 'firebase/database'
+import { getDatabase, ref, push, set, onValue, remove, query, limitToLast } from 'firebase/database'
 
 // Firebase config - Replace with your values from Firebase Console
 const firebaseConfig = {
@@ -12,12 +12,53 @@ const firebaseConfig = {
   databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
 }
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig)
-const database = getDatabase(app)
+const resolvedDatabaseURL =
+  firebaseConfig.databaseURL ||
+  (firebaseConfig.projectId
+    ? `https://${firebaseConfig.projectId}-default-rtdb.firebaseio.com`
+    : '')
+
+firebaseConfig.databaseURL = resolvedDatabaseURL
+
+const requiredKeys = [
+  'apiKey',
+  'authDomain',
+  'projectId',
+  'storageBucket',
+  'messagingSenderId',
+  'appId',
+]
+
+const missingKeys = requiredKeys.filter((key) => {
+  const value = firebaseConfig[key]
+  if (!value) return true
+  if (key === 'databaseURL' && value.includes('your_project')) return true
+  return false
+})
+
+export const getFirebaseConfigError = () => {
+  if (missingKeys.length === 0) return ''
+
+  return `Cau hinh Firebase chua day du: ${missingKeys.join(', ')}. Kiem tra file .env va .env.production.`
+}
+
+const getDb = () => {
+  const configError = getFirebaseConfigError()
+  if (configError) {
+    throw new Error(configError)
+  }
+
+  if (!firebaseConfig.databaseURL) {
+    throw new Error('Khong tim thay databaseURL. Hay tao Realtime Database trong Firebase Console.')
+  }
+
+  const app = initializeApp(firebaseConfig)
+  return getDatabase(app)
+}
 
 // Messages functions
 export const sendMessage = (username, text) => {
+  const database = getDb()
   const messagesRef = ref(database, 'messages')
   const newMessageRef = push(messagesRef)
   
@@ -29,26 +70,36 @@ export const sendMessage = (username, text) => {
   })
 }
 
-export const listenToMessages = (callback) => {
+export const listenToMessages = (callback, onError) => {
+  const database = getDb()
   const messagesRef = ref(database, 'messages')
   const messagesQuery = query(messagesRef, limitToLast(50))
   
-  return onValue(messagesQuery, (snapshot) => {
-    const messages = []
-    snapshot.forEach((childSnapshot) => {
-      messages.push({
-        id: childSnapshot.key,
-        ...childSnapshot.val(),
+  return onValue(
+    messagesQuery,
+    (snapshot) => {
+      const messages = []
+      snapshot.forEach((childSnapshot) => {
+        messages.push({
+          id: childSnapshot.key,
+          ...childSnapshot.val(),
+        })
       })
-    })
-    // Sort by timestamp ascending
-    messages.sort((a, b) => a.timestamp - b.timestamp)
-    callback(messages)
-  })
+      // Sort by timestamp ascending
+      messages.sort((a, b) => a.timestamp - b.timestamp)
+      callback(messages)
+    },
+    (error) => {
+      if (onError) {
+        onError(error)
+      }
+    }
+  )
 }
 
 // Users functions
 export const addUser = (username, userId) => {
+  const database = getDb()
   const usersRef = ref(database, `users/${userId}`)
   return set(usersRef, {
     username,
@@ -58,27 +109,38 @@ export const addUser = (username, userId) => {
 }
 
 export const removeUser = (userId) => {
+  const database = getDb()
   const usersRef = ref(database, `users/${userId}`)
   return remove(usersRef)
 }
 
-export const listenToUsers = (callback) => {
+export const listenToUsers = (callback, onError) => {
+  const database = getDb()
   const usersRef = ref(database, 'users')
   
-  return onValue(usersRef, (snapshot) => {
-    const users = []
-    snapshot.forEach((childSnapshot) => {
-      users.push({
-        socketId: childSnapshot.key,
-        ...childSnapshot.val(),
+  return onValue(
+    usersRef,
+    (snapshot) => {
+      const users = []
+      snapshot.forEach((childSnapshot) => {
+        users.push({
+          socketId: childSnapshot.key,
+          ...childSnapshot.val(),
+        })
       })
-    })
-    callback(users)
-  })
+      callback(users)
+    },
+    (error) => {
+      if (onError) {
+        onError(error)
+      }
+    }
+  )
 }
 
 // System messages
 export const addSystemMessage = (text) => {
+  const database = getDb()
   const messagesRef = ref(database, 'messages')
   const newMessageRef = push(messagesRef)
   
@@ -88,5 +150,3 @@ export const addSystemMessage = (text) => {
     isSystem: true,
   })
 }
-
-export default database

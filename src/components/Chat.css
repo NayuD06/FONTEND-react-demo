@@ -86,6 +86,17 @@
   color: #f59e0b;
 }
 
+.status.error {
+  color: #ef4444;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-top: 14px !important;
+  text-align: left;
+  line-height: 1.4;
+}
+
 .chat-wrapper {
   display: flex;
   height: 100vh;
@@ -128,6 +139,14 @@
   font-size: 13px;
   opacity: 0.85;
   font-weight: 500;
+}
+
+.header-content .header-error {
+  margin: 8px 0 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 1;
+  color: #ffe4e6;
 }
 
 .connection-status {
