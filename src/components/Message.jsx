@@ -11,9 +11,19 @@ export default function Message({ message, isUser, currentUser }) {
     )
   }
 
+  const time = message.timestamp 
+    ? new Date(message.timestamp).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      })
+    : ''
+
+  const isCurrentUser = message.username === currentUser
+
   return (
-    <div className={`message ${isUser ? 'user-message' : 'other-message'}`}>
-      {!isUser && (
+    <div className={`message ${isCurrentUser ? 'user-message' : 'other-message'}`}>
+      {!isCurrentUser && (
         <div className="sender-info">
           <span className="sender-avatar">👤</span>
           <span className="sender-name">{message.username}</span>
@@ -21,7 +31,7 @@ export default function Message({ message, isUser, currentUser }) {
       )}
       <div className="message-content">
         <p>{message.text}</p>
-        <span className="message-time">{message.time}</span>
+        <span className="message-time">{time}</span>
       </div>
     </div>
   )

@@ -1,94 +1,71 @@
 import { useState, useEffect } from 'react'
-import { io } from 'socket.io-client'
 import MessageList from './MessageList'
 import ChatInput from './ChatInput'
 import UserList from './UserList'
+import {
+  sendMessage,
+  listenToMessages,
+  addUser,
+  removeUser,
+  listenToUsers,
+  addSystemMessage,
+} from '../services/firebaseService'
 import './Chat.css'
 
 export default function Chat() {
   const [messages, setMessages] = useState([])
   const [users, setUsers] = useState([])
   const [username, setUsername] = useState('')
-  const [socket, setSocket] = useState(null)
   const [isConnected, setIsConnected] = useState(false)
   const [typing, setTyping] = useState('')
+  const [currentUserId] = useState(`user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
 
+  // Initialize Firebase listeners
   useEffect(() => {
-    // Create socket connection
-    const newSocket = io('http://localhost:3001', {
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
+    if (!username) return
+
+    // Add current user
+    addUser(username, currentUserId)
+    addSystemMessage(`${username} joined the chat`)
+    setIsConnected(true)
+
+    // Listen to messages
+    const unsubscribeMessages = listenToMessages((msgs) => {
+      setMessages(msgs)
     })
 
-    newSocket.on('connect', () => {
-      console.log('Connected to server')
-      setIsConnected(true)
+    // Listen to users
+    const unsubscribeUsers = listenToUsers((usersList) => {
+      setUsers(usersList)
     })
 
-    newSocket.on('disconnect', () => {
-      console.log('Disconnected from server')
-      setIsConnected(false)
-    })
-
-    newSocket.on('receive-message', (messageData) => {
-      setMessages((prev) => [...prev, messageData])
-    })
-
-    newSocket.on('user-list', (userList) => {
-      setUsers(userList)
-    })
-
-    newSocket.on('system-message', (message) => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          ...message,
-          isUser: false,
-          isSystem: true,
-        },
-      ])
-    })
-
-    newSocket.on('user-typing', (typingUsername) => {
-      setTyping(typingUsername)
-    })
-
-    newSocket.on('user-stop-typing', () => {
-      setTyping('')
-    })
-
-    setSocket(newSocket)
-
+    // Cleanup
     return () => {
-      newSocket.close()
+      unsubscribeMessages()
+      unsubscribeUsers()
+      removeUser(currentUserId)
+      addSystemMessage(`${username} left the chat`)
     }
-  }, [])
+  }, [username, currentUserId])
 
   const handleJoin = (name) => {
-    if (socket && name.trim()) {
+    if (name.trim()) {
       setUsername(name)
-      socket.emit('user-join', name)
     }
   }
 
   const handleSendMessage = (text) => {
-    if (socket && text.trim()) {
-      socket.emit('send-message', { text })
+    if (text.trim() && username) {
+      sendMessage(username, text)
     }
   }
 
   const handleTyping = () => {
-    if (socket && username) {
-      socket.emit('user-typing', username)
-    }
+    // Firebase typing indicator can be added here if needed
   }
 
   const handleStopTyping = () => {
-    if (socket) {
-      socket.emit('user-stop-typing')
-    }
+    // Firebase typing indicator can be added here if needed
   }
 
   // Join room UI
