@@ -1,10 +1,10 @@
-import Calculator from './components/Calculator'
+import Chat from './components/Chat'
 import './App.css'
 
 function App() {
   return (
     <>
-      <Calculator />
+      <Chat />
     </>
   )
 }

@@ -1,0 +1,106 @@
+.user-list-sidebar {
+  width: 200px;
+  background: #f9f9f9;
+  border-right: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  max-height: 100vh;
+}
+
+.sidebar-header {
+  padding: 15px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #ddd;
+}
+
+.sidebar-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.user-count {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.users-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 0;
+}
+
+.user-item {
+  padding: 10px 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.2s ease;
+}
+
+.user-item:hover {
+  background: #f0f0f0;
+}
+
+.user-status {
+  font-size: 12px;
+}
+
+.user-name {
+  font-size: 13px;
+  color: #333;
+  word-break: break-word;
+  flex: 1;
+}
+
+.you {
+  font-size: 11px;
+  color: #999;
+  margin-left: 5px;
+}
+
+.no-users {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: #999;
+  text-align: center;
+  padding: 20px;
+}
+
+.no-users p {
+  margin: 0;
+}
+
+/* Scrollbar styling */
+.users-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.users-scroll::-webkit-scrollbar-track {
+  background: #f9f9f9;
+}
+
+.users-scroll::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
+
+.users-scroll::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
+
+@media (max-width: 768px) {
+  .user-list-sidebar {
+    display: none;
+  }
+}
