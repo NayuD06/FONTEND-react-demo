@@ -11,7 +11,7 @@ const normalizeBaseUrl = (baseUrl) => baseUrl.replace(/\/$/, '')
 const request = async (path, options = {}) => {
   if (!API_BASE_URL) {
     throw new Error(
-      'Chưa cấu hình VITE_API_BASE_URL cho môi trường deploy. Hãy trỏ tới backend API công khai (ví dụ Railway/Render).'
+      'Chưa cấu hình VITE_API_BASE_URL cho môi trường deploy. Nếu dùng Vercel, vào Project Settings > Environment Variables và thêm URL backend API công khai.'
     )
   }
 
@@ -21,6 +21,16 @@ const request = async (path, options = {}) => {
   ) {
     throw new Error(
       'VITE_API_BASE_URL đang trỏ vào chính frontend domain. Hãy đổi sang domain backend API (ví dụ Railway/Render).'
+    )
+  }
+
+  if (
+    typeof window !== 'undefined' &&
+    !isBrowserLocalhost &&
+    /localhost|127\.0\.0\.1/.test(API_BASE_URL)
+  ) {
+    throw new Error(
+      'VITE_API_BASE_URL đang trỏ tới localhost nên bản deploy không thể kết nối. Hãy đổi sang URL backend public (Railway/Render).' 
     )
   }
 
@@ -46,7 +56,7 @@ const request = async (path, options = {}) => {
     })
   } catch {
     throw new Error(
-      'Không kết nối được API chat. Kiểm tra backend đã chạy chưa và VITE_API_BASE_URL có đúng không.'
+      `Không kết nối được API chat. Kiểm tra backend đã chạy chưa. API URL hiện tại: ${normalizeBaseUrl(API_BASE_URL)}`
     )
   }
 
