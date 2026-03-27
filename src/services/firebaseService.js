@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app'
+import { initializeApp, getApp, getApps } from 'firebase/app'
 import { getDatabase, ref, push, set, onValue, remove, query, limitToLast } from 'firebase/database'
 
 // Firebase config - Replace with your values from Firebase Console
@@ -42,17 +42,21 @@ export const getFirebaseConfigError = () => {
   return `Cau hinh Firebase chua day du: ${missingKeys.join(', ')}. Kiem tra file .env va .env.production.`
 }
 
-const getDb = () => {
+export const getFirebaseApp = () => {
   const configError = getFirebaseConfigError()
   if (configError) {
     throw new Error(configError)
   }
 
+  return getApps().length ? getApp() : initializeApp(firebaseConfig)
+}
+
+const getDb = () => {
   if (!firebaseConfig.databaseURL) {
     throw new Error('Khong tim thay databaseURL. Hay tao Realtime Database trong Firebase Console.')
   }
 
-  const app = initializeApp(firebaseConfig)
+  const app = getFirebaseApp()
   return getDatabase(app)
 }
 

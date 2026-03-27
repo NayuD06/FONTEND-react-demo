@@ -1,6 +1,6 @@
 import './Message.css'
 
-export default function Message({ message, isUser, currentUser }) {
+export default function Message({ message, currentUser }) {
   const isSystem = message.isSystem
   
   if (isSystem) {

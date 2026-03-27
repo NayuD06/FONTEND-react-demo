@@ -1,0 +1,130 @@
+.auth-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 15% 10%, rgba(13, 148, 136, 0.18), transparent 35%),
+    radial-gradient(circle at 80% 90%, rgba(20, 184, 166, 0.14), transparent 34%),
+    var(--ui-bg);
+  padding: 20px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 430px;
+  background: var(--ui-panel);
+  border-radius: 18px;
+  border: 1px solid var(--ui-line);
+  padding: 30px;
+  box-shadow: var(--ui-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-card h1 {
+  margin: 0;
+  color: var(--ui-ink);
+  font-family: 'Sora', 'Manrope', sans-serif;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.auth-card p {
+  margin: 0 0 10px 0;
+  color: var(--ui-muted);
+  font-size: 14px;
+}
+
+.auth-input {
+  width: 100%;
+  border: 1px solid #ccdae3;
+  border-radius: 12px;
+  padding: 13px 14px;
+  font-size: 15px;
+  transition: border-color 0.2s ease;
+}
+
+.auth-input-invalid {
+  border-color: #f59e0b;
+}
+
+.auth-input:focus {
+  border-color: var(--ui-brand);
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.14);
+}
+
+.auth-rules {
+  background: #f3f8fb;
+  border: 1px solid #d7e6ef;
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 5px;
+}
+
+.auth-rules p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.rule-ok {
+  color: #186164;
+}
+
+.rule-fail {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.auth-button {
+  margin-top: 6px;
+  border: none;
+  border-radius: 12px;
+  padding: 13px;
+  font-size: 15px;
+  font-weight: 600;
+  background: linear-gradient(140deg, var(--ui-brand), var(--ui-brand-2));
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.auth-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(13, 148, 136, 0.26);
+}
+
+.auth-button:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.auth-error {
+  margin: 6px 0 0 0;
+  font-size: 13px;
+  color: var(--ui-danger);
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  padding: 10px;
+  border-radius: 10px;
+}
+
+.auth-toggle {
+  margin-top: 4px;
+  border: none;
+  background: transparent;
+  color: var(--ui-brand);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 26px 20px;
+  }
+}

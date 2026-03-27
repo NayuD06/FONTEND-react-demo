@@ -1,16 +1,75 @@
-# React + Vite
+# Chat App (Firebase Auth + MongoDB)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Ung dung chat don gian voi:
+- Frontend: React + Vite
+- Xac thuc: Firebase Authentication (email/password)
+- Luu tin nhan: MongoDB qua Express API
 
-Currently, two official plugins are available:
+## 1. Cai dat
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Tai thu muc goc:
 
-## React Compiler
+```bash
+npm install
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Tai thu muc server:
 
-## Expanding the ESLint configuration
+```bash
+cd server
+npm install
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 2. Cau hinh bien moi truong
+
+Tao file .env tai thu muc goc tu mau .env.example.
+
+Can thiet:
+
+```bash
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
+VITE_FIREBASE_DATABASE_URL=
+VITE_API_BASE_URL=http://localhost:3001
+```
+
+Tao file .env tai thu muc server tu mau server/.env.example.
+
+Can thiet:
+
+```bash
+PORT=3001
+MONGO_URI=mongodb://127.0.0.1:27017/chat_app03
+```
+
+## 3. Chay local
+
+Tu thu muc goc:
+
+```bash
+npm run start
+```
+
+Lenh nay chay dong thoi frontend va backend.
+
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:3001
+
+## 4. API chinh
+
+- GET /api/messages?limit=60
+- POST /api/messages
+- GET /api/users
+- POST /api/users
+- DELETE /api/users/:userId
+
+## 5. Ghi chu
+
+- Tai khoan dang nhap dang dung Firebase Auth.
+- Tin nhan va thong diep he thong duoc luu trong MongoDB.
+- Danh sach user online duoc giu tam trong bo nho server.
+- Khi deploy frontend, bat buoc set VITE_API_BASE_URL tro toi backend public (https://...), neu khong app se OFFLINE.

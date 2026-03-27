@@ -7,8 +7,10 @@
     "dev": "vite",
     "server": "cd server && npm start",
     "server-dev": "cd server && npm run dev",
+    "start:dev": "concurrently \"cd server && npm run dev\" \"vite\"",
     "start": "concurrently \"cd server && npm start\" \"vite\"",
     "build": "vite build",
+    "deploy:hosting": "npm run build && firebase deploy --only hosting",
     "lint": "eslint .",
     "preview": "vite preview"
   },
