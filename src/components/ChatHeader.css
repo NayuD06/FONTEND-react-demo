@@ -1,32 +1,124 @@
+.chat-header {
+  background: var(--panel-bg, #15141a);
+  border-bottom: 1px solid var(--line, #2b2a33);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chat-header-contact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.contact-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2f2421;
+  background: linear-gradient(145deg, #fef3de, #d09b47);
+  border: 1px solid #d7b57a;
+  flex-shrink: 0;
+}
+
+.header-content {
+  min-width: 0;
+}
+
+.header-content h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text, #f3f6fb);
+  line-height: 1.1;
+}
+
+.header-content p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--accent, #28d146);
+  font-weight: 700;
+  display: block;
+}
+
+.header-error {
+  margin: 4px 0 0;
+  color: #f57373;
+  font-size: 12px;
+}
+
 .header-actions {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.logout-button {
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  background: rgba(255, 255, 255, 0.16);
-  color: #ffffff;
+.connection-status {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 5px 8px;
   border-radius: 999px;
-  padding: 7px 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s ease;
 }
 
-.logout-button:hover {
-  background: rgba(255, 255, 255, 0.26);
+.connection-status.connected {
+  color: #34de4c;
+  background: rgba(20, 84, 35, 0.3);
+}
+
+.connection-status.disconnected {
+  color: #ff7b88;
+  background: rgba(136, 33, 33, 0.28);
+}
+
+.header-meta {
+  font-size: 11px;
+  color: var(--muted, #a8adba);
+}
+
+.header-icon-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--line, #2b2a33);
+  background: var(--panel-soft, #1b1a22);
+  color: var(--text, #f3f6fb);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.header-icon-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
 }
 
 @media (max-width: 768px) {
-  .header-actions {
-    flex-direction: column;
-    align-items: flex-end;
+  .chat-header {
+    padding: 12px;
   }
 
-  .logout-button {
-    padding: 6px 12px;
-    font-size: 12px;
+  .header-actions {
+    gap: 8px;
+  }
+
+  .connection-status,
+  .header-meta {
+    display: none;
+  }
+
+  .header-icon-button {
+    width: 30px;
+    height: 30px;
+    font-size: 11px;
   }
 }

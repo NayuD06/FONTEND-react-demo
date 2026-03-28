@@ -1,0 +1,168 @@
+.profile-sidebar {
+  width: 280px;
+  background: var(--panel-bg, #15141a);
+  border-left: 1px solid var(--line, #2b2a33);
+  padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--text, #f3f6fb);
+}
+
+.profile-avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #2f2421;
+  background: radial-gradient(circle at 28% 22%, #fff9ef, #cf9944 70%);
+  border: 1px solid #d6b37a;
+  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.24);
+}
+
+.profile-sidebar h3 {
+  margin: 6px 0 0;
+  font-size: 22px;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--text, #f3f6fb);
+}
+
+.profile-sidebar p {
+  margin: 0;
+  color: var(--muted, #a8adba);
+  font-size: 13px;
+}
+
+.profile-actions {
+  width: 100%;
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.profile-actions button {
+  border: 1px solid var(--line, #2b2a33);
+  background: var(--panel-soft, #1b1a22);
+  padding: 10px;
+  border-radius: 12px;
+  color: var(--text, #f3f6fb);
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.profile-actions button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+}
+
+.profile-stats {
+  width: 100%;
+  border-top: 1px solid var(--line, #2b2a33);
+  border-bottom: 1px solid var(--line, #2b2a33);
+  margin-top: 14px;
+  padding: 14px 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.profile-stats div {
+  text-align: center;
+}
+
+.profile-stats span {
+  display: block;
+  color: var(--muted, #a8adba);
+  font-size: 12px;
+}
+
+.profile-stats strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--text, #f3f6fb);
+  font-size: 18px;
+}
+
+.profile-attachments {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.profile-attachments h4 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--muted, #a8adba);
+}
+
+.online-users-list {
+  max-height: 100px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.online-user-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text, #f3f6fb);
+  font-size: 12px;
+}
+
+.online-empty {
+  margin: 0;
+  color: var(--muted, #a8adba);
+  font-size: 12px;
+}
+
+.online-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent, #28d146);
+}
+
+.attachment-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.attachment-list button {
+  border: none;
+  background: var(--panel-soft, #1b1a22);
+  color: var(--muted, #a8adba);
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 10px 6px;
+  cursor: pointer;
+}
+
+.logout-side-button {
+  width: 100%;
+  margin-top: auto;
+  border: 1px solid var(--line, #2b2a33);
+  background: var(--panel-soft, #1b1a22);
+  color: var(--text, #f3f6fb);
+  border-radius: 999px;
+  padding: 10px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 1100px) {
+  .profile-sidebar {
+    display: none;
+  }
+}

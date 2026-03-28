@@ -1,5 +1,21 @@
 import { initializeApp, getApp, getApps } from 'firebase/app'
-import { getDatabase, ref, push, set, onValue, remove, query, limitToLast } from 'firebase/database'
+import {
+  getDatabase,
+  ref,
+  push,
+  set,
+  onValue,
+  remove,
+  query,
+  limitToLast,
+  onDisconnect,
+  update,
+  get,
+} from 'firebase/database'
+
+export const ONLINE_TTL_MS = 10 * 60 * 1000
+
+const allowedUserCache = new Set()
 
 // Firebase config - Replace with your values from Firebase Console
 const firebaseConfig = {
@@ -60,15 +76,58 @@ const getDb = () => {
   return getDatabase(app)
 }
 
+const ensureUserIsProvisioned = async (userId) => {
+  if (!userId) {
+    const error = new Error('Missing Firebase user id.')
+    error.code = 'permission_denied'
+    throw error
+  }
+
+  if (allowedUserCache.has(userId)) return true
+
+  const database = getDb()
+  const allowedRef = ref(database, `allowedUsers/${userId}`)
+  const snapshot = await get(allowedRef)
+  const isAllowed = snapshot.exists() && snapshot.val() === true
+
+  if (!isAllowed) {
+    const error = new Error('Tai khoan chua duoc cap quyen chat tren Firebase.')
+    error.code = 'permission_denied'
+    throw error
+  }
+
+  allowedUserCache.add(userId)
+  return true
+}
+
+export const setProvisionedUserAccess = async (userId) => {
+  if (!userId) return
+  const database = getDb()
+  const allowedRef = ref(database, `allowedUsers/${userId}`)
+  await set(allowedRef, true)
+  allowedUserCache.add(userId)
+}
+
+export const removeProvisionedUserAccess = async (userId) => {
+  if (!userId) return
+  const database = getDb()
+  const allowedRef = ref(database, `allowedUsers/${userId}`)
+  await remove(allowedRef)
+  allowedUserCache.delete(userId)
+}
+
 // Messages functions
-export const sendMessage = (username, text) => {
+export const sendMessage = async (username, text, recipient = '', senderUid = '') => {
+  await ensureUserIsProvisioned(senderUid)
   const database = getDb()
   const messagesRef = ref(database, 'messages')
   const newMessageRef = push(messagesRef)
   
   return set(newMessageRef, {
+    senderUid,
     username,
     text,
+    recipient,
     timestamp: Date.now(),
     sender: username, // to identify which side to show message
   })
@@ -103,19 +162,45 @@ export const listenToMessages = (callback, onError) => {
 
 // Users functions
 export const addUser = (username, userId) => {
+  const run = async () => {
+    await ensureUserIsProvisioned(userId)
   const database = getDb()
   const usersRef = ref(database, `users/${userId}`)
-  return set(usersRef, {
-    username,
-    timestamp: Date.now(),
-    status: 'online',
-  })
+  const now = Date.now()
+
+    await set(usersRef, {
+      username,
+      timestamp: now,
+      lastActive: now,
+      status: 'online',
+    })
+
+    const disconnect = onDisconnect(usersRef)
+    await disconnect.remove()
+  }
+
+  return run()
 }
 
 export const removeUser = (userId) => {
   const database = getDb()
   const usersRef = ref(database, `users/${userId}`)
   return remove(usersRef)
+}
+
+export const touchUserActivity = (userId) => {
+  const run = async () => {
+    if (!userId) return
+    await ensureUserIsProvisioned(userId)
+    const database = getDb()
+    const usersRef = ref(database, `users/${userId}`)
+    await update(usersRef, {
+      lastActive: Date.now(),
+      status: 'online',
+    })
+  }
+
+  return run()
 }
 
 export const listenToUsers = (callback, onError) => {
@@ -125,11 +210,23 @@ export const listenToUsers = (callback, onError) => {
   return onValue(
     usersRef,
     (snapshot) => {
+      const now = Date.now()
       const users = []
       snapshot.forEach((childSnapshot) => {
+        const userData = childSnapshot.val() || {}
+        const lastActive = userData.lastActive || userData.timestamp || 0
+        const isOnline =
+          userData.status === 'online' &&
+          now - lastActive <= ONLINE_TTL_MS
+
+        if (!isOnline) {
+          return
+        }
+
         users.push({
           socketId: childSnapshot.key,
-          ...childSnapshot.val(),
+          ...userData,
+          lastActive,
         })
       })
       callback(users)

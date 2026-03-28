@@ -1,0 +1,27 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": false,
+    "allowedUsers": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.val() === true || newData.val() === null"
+      }
+    },
+    "users": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid && root.child('allowedUsers/' + auth.uid).val() === true",
+        ".validate": "newData.val() === null || (newData.hasChildren(['username', 'timestamp', 'lastActive', 'status']) && newData.child('username').isString() && newData.child('username').val().length > 0 && newData.child('username').val().length <= 64 && newData.child('timestamp').isNumber() && newData.child('lastActive').isNumber() && newData.child('status').isString())"
+      }
+    },
+    "messages": {
+      ".read": "auth != null",
+      "$messageId": {
+        ".write": "auth != null && root.child('allowedUsers/' + auth.uid).val() === true && newData.child('senderUid').val() === auth.uid",
+        ".validate": "newData.hasChildren(['senderUid', 'username', 'text', 'recipient', 'timestamp']) && newData.child('senderUid').isString() && newData.child('senderUid').val().length > 0 && newData.child('senderUid').val().length <= 128 && newData.child('username').isString() && newData.child('username').val().length > 0 && newData.child('username').val().length <= 64 && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 2000 && newData.child('recipient').isString() && newData.child('recipient').val().length <= 64 && newData.child('timestamp').isNumber()"
+      }
+    }
+  }
+}

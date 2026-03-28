@@ -1,70 +1,223 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import ChatHeader from './ChatHeader'
 import MessageList from './MessageList'
 import ChatInput from './ChatInput'
 import UserList from './UserList'
+import ProfileSidebar from './ProfileSidebar'
 import {
-  fetchMessages,
-  fetchUsers,
-  joinChat,
-  leaveChat,
-  sendChatMessage,
-} from '../services/chatApiService'
+  addUser,
+  getFirebaseConfigError,
+  listenToMessages,
+  listenToUsers,
+  ONLINE_TTL_MS,
+  removeUser,
+  sendMessage,
+  touchUserActivity,
+} from '../services/firebaseService'
+import { fetchAllUserProfiles } from '../services/chatApiService'
 import './Chat.css'
+
+const resolveTheme = () => {
+  const storedTheme = localStorage.getItem('chatTheme')
+  return storedTheme === 'light' || storedTheme === 'dark' ? storedTheme : 'dark'
+}
+
+const toSafeText = (value, fallback = '') => {
+  if (typeof value === 'string') return value
+  if (value === null || value === undefined) return fallback
+  return String(value)
+}
 
 export default function Chat({ currentUser, onLogout, authError }) {
   const [messages, setMessages] = useState([])
   const [users, setUsers] = useState([])
+  const [mongoUsers, setMongoUsers] = useState([])
+  const [selectedUsers, setSelectedUsers] = useState([])
+  const [selectedContact, setSelectedContact] = useState('')
+  const [theme, setTheme] = useState(resolveTheme)
   const [isConnected, setIsConnected] = useState(false)
   const [connectionError, setConnectionError] = useState('')
+  const isLoggingOutRef = useRef(false)
 
   const currentUserId = currentUser?.uid || ''
-  const username =
-    currentUser?.displayName ||
-    currentUser?.email?.split('@')[0] ||
-    'User'
-  const error = connectionError || authError
+  const username = toSafeText(
+    currentUser?.displayName || currentUser?.email?.split('@')[0],
+    'User',
+  )
+  const configError = getFirebaseConfigError()
+  const error = connectionError || authError || configError
   const typing = ''
+  const safeMessages = messages.map((message, index) => ({
+    ...message,
+    id: toSafeText(message?.id, `safe-msg-${index}`),
+    username: toSafeText(message?.username, ''),
+    recipient: toSafeText(message?.recipient, ''),
+    text: toSafeText(message?.text, ''),
+    timestamp: Number(message?.timestamp || 0),
+  }))
+  const normalizedUsers = users
+    .map((user) => ({
+      socketId: toSafeText(user?.socketId, ''),
+      username: toSafeText(user?.username, '').trim(),
+      status: toSafeText(user?.status, 'online'),
+      lastActive: Number(user?.lastActive || user?.timestamp || 0),
+    }))
+    .filter((user) => user.socketId && user.username)
+
+  const onlineUsers =
+    normalizedUsers.some((user) => user.socketId === currentUserId) || !currentUserId
+      ? normalizedUsers
+      : [
+          ...normalizedUsers,
+          {
+            socketId: currentUserId,
+            username,
+            status: 'online',
+            lastActive: Date.now(),
+          },
+        ]
+
+  const normalizedMongoUsers = mongoUsers
+    .map((user) => {
+      const displayName = toSafeText(user?.displayName, '').trim()
+      const emailName = toSafeText(user?.email, '').split('@')[0] || ''
+      const userLabel = displayName || emailName || toSafeText(user?.firebaseUid, '').slice(0, 8)
+
+      return {
+        id: toSafeText(user?.id, toSafeText(user?.firebaseUid, userLabel)),
+        username: userLabel,
+        firebaseUid: toSafeText(user?.firebaseUid, ''),
+      }
+    })
+    .filter((user) => user.username && user.firebaseUid !== currentUserId)
+
+  const normalizedFirebaseUsers = onlineUsers
+    .map((user) => ({
+      id: toSafeText(user?.socketId, ''),
+      username: toSafeText(user?.username, '').trim(),
+      firebaseUid: toSafeText(user?.socketId, ''),
+      isOnline: true,
+      lastActive: Number(user?.lastActive || 0),
+    }))
+    .filter((user) => user.username && user.firebaseUid && user.firebaseUid !== currentUserId)
+
+  const mergedUsersMap = new Map()
+  normalizedMongoUsers.forEach((user) => {
+    mergedUsersMap.set(user.firebaseUid, {
+      ...user,
+      isOnline: false,
+      lastActive: 0,
+    })
+  })
+  normalizedFirebaseUsers.forEach((user) => {
+    const existed = mergedUsersMap.get(user.firebaseUid)
+    mergedUsersMap.set(user.firebaseUid, {
+      ...(existed || {}),
+      ...user,
+      username: user.username || existed?.username || '',
+      isOnline: true,
+      lastActive: user.lastActive,
+    })
+  })
+
+  const directoryUsers = [...mergedUsersMap.values()].sort((a, b) => {
+    if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1
+    return (b.lastActive || 0) - (a.lastActive || 0)
+  })
+
+  const selectedUserSet = new Set(selectedUsers)
+  const contacts = directoryUsers.filter((user) => selectedUserSet.has(user.username))
+  const availableUsers = directoryUsers.filter((user) => !selectedUserSet.has(user.username))
+  const selectedContactData = contacts.find((user) => user.username === selectedContact) || null
+  const activeContactName = toSafeText(selectedContactData?.username, 'General chat room')
+  const conversationMessages = safeMessages.filter((message) => {
+    if (message.isSystem) return false
+    if (!selectedContact) return false
+
+    const isInbound = message.username === selectedContact && message.recipient === username
+    const isOutbound = message.username === username && message.recipient === selectedContact
+
+    return isInbound || isOutbound
+  })
+
+  useEffect(() => {
+    const normalizedTheme = theme === 'light' || theme === 'dark' ? theme : 'dark'
+    if (normalizedTheme !== theme) {
+      setTheme(normalizedTheme)
+      return
+    }
+    localStorage.setItem('chatTheme', normalizedTheme)
+  }, [theme])
+
+  useEffect(() => {
+    if (selectedContact && contacts.some((user) => user.username === selectedContact)) {
+      return
+    }
+
+    if (contacts.length > 0) {
+      setSelectedContact(contacts[0].username)
+      return
+    }
+
+    setSelectedContact('')
+  }, [contacts, selectedContact])
+
+  useEffect(() => {
+    if (!currentUserId) return
+
+    let isMounted = true
+
+    const loadMongoUsers = async () => {
+      try {
+        const profiles = await fetchAllUserProfiles()
+        if (!isMounted) return
+        setMongoUsers(Array.isArray(profiles) ? profiles : [])
+      } catch {
+        if (isMounted) setMongoUsers([])
+      }
+    }
+
+    loadMongoUsers()
+    const intervalId = window.setInterval(loadMongoUsers, 10000)
+
+    return () => {
+      isMounted = false
+      window.clearInterval(intervalId)
+    }
+  }, [currentUserId])
+
+  useEffect(() => {
+    if (selectedUsers.length > 0) return
+    if (directoryUsers.length === 0) return
+
+    setSelectedUsers([directoryUsers[0].username])
+  }, [directoryUsers, selectedUsers.length])
 
   const toFriendlyError = (err) => {
     const message = err?.message || ''
-    if (!message) return 'Không thể kết nối server chat.'
-    if (message.toLowerCase().includes('failed to fetch')) {
-      return 'Không gọi được API chat. Hãy kiểm tra backend và VITE_API_BASE_URL.'
+    if (!message) return 'Không thể kết nối Firebase Realtime Database.'
+    if (message.includes('permission_denied')) {
+      return 'Tài khoản chưa được cấp quyền sử dụng chat trên Firebase.'
     }
+    if (message.includes('Cau hinh Firebase chua day du')) return message
     return message
   }
 
   useEffect(() => {
     if (!username || !currentUserId) return
+    if (configError) {
+      return
+    }
 
     let isMounted = true
-    let intervalId = null
-
-    const syncData = async () => {
-      if (isMounted) {
-        try {
-          const [messagesData, usersData] = await Promise.all([
-            fetchMessages(60),
-            fetchUsers(),
-          ])
-          setMessages(messagesData)
-          setUsers(usersData)
-          setConnectionError('')
-        } catch (err) {
-          setConnectionError(toFriendlyError(err))
-          setIsConnected(false)
-        }
-      }
-    }
 
     const bootstrap = async () => {
       try {
-        await joinChat(currentUserId, username)
+        await addUser(username, currentUserId)
+        await touchUserActivity(currentUserId)
         if (!isMounted) return
         setIsConnected(true)
-        await syncData()
-        intervalId = window.setInterval(syncData, 2000)
+        setConnectionError('')
       } catch (err) {
         if (isMounted) {
           setConnectionError(toFriendlyError(err))
@@ -73,27 +226,100 @@ export default function Chat({ currentUser, onLogout, authError }) {
       }
     }
 
+    const unsubscribeMessages = listenToMessages(
+      (messagesData) => {
+        if (isMounted) setMessages(messagesData)
+      },
+      (err) => {
+        if (isMounted) {
+          setConnectionError(toFriendlyError(err))
+          setIsConnected(false)
+        }
+      }
+    )
+
+    const unsubscribeUsers = listenToUsers(
+      (usersData) => {
+        if (isMounted) setUsers(usersData)
+      },
+      (err) => {
+        if (isMounted) {
+          setConnectionError(toFriendlyError(err))
+          setIsConnected(false)
+        }
+      }
+    )
+
     bootstrap()
 
     return () => {
       isMounted = false
-      if (intervalId) {
-        window.clearInterval(intervalId)
-      }
-      leaveChat(currentUserId).catch(() => {
-        if (isMounted) {
-          setConnectionError('Không thể cập nhật trạng thái rời phòng.')
-        }
-      })
+      unsubscribeMessages()
+      unsubscribeUsers()
+      removeUser(currentUserId).catch(() => {})
     }
-  }, [username, currentUserId])
+  }, [username, currentUserId, configError])
+
+  useEffect(() => {
+    if (!currentUserId) return
+
+    let timeoutId = null
+    let heartbeatId = null
+
+    const handleAutoLogout = async () => {
+      if (isLoggingOutRef.current) return
+      isLoggingOutRef.current = true
+      await onLogout()
+    }
+
+    const resetInactivityTimer = () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId)
+      }
+      timeoutId = window.setTimeout(() => {
+        handleAutoLogout().catch(() => {})
+      }, ONLINE_TTL_MS)
+    }
+
+    const markActivity = () => {
+      touchUserActivity(currentUserId).catch(() => {})
+      resetInactivityTimer()
+    }
+
+    const activityEvents = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click']
+    activityEvents.forEach((eventName) => {
+      window.addEventListener(eventName, markActivity, { passive: true })
+    })
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        markActivity()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    resetInactivityTimer()
+    heartbeatId = window.setInterval(() => {
+      touchUserActivity(currentUserId).catch(() => {})
+    }, 60 * 1000)
+
+    return () => {
+      if (timeoutId) window.clearTimeout(timeoutId)
+      if (heartbeatId) window.clearInterval(heartbeatId)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, markActivity)
+      })
+      isLoggingOutRef.current = false
+    }
+  }, [currentUserId, onLogout, username])
 
   const handleSendMessage = async (text) => {
+    if (!selectedContact) return
+
     if (text.trim() && username) {
       try {
-        await sendChatMessage(username, text)
-        const messagesData = await fetchMessages(60)
-        setMessages(messagesData)
+        await sendMessage(username, text, selectedContact, currentUserId)
       } catch (err) {
         setConnectionError(toFriendlyError(err))
         setIsConnected(false)
@@ -109,24 +335,68 @@ export default function Chat({ currentUser, onLogout, authError }) {
     // Firebase typing indicator can be added here if needed
   }
 
+  const handleAddUser = (usernameToAdd) => {
+    const safeName = toSafeText(usernameToAdd, '').trim()
+    if (!safeName) return
+
+    setSelectedUsers((prev) => {
+      if (prev.includes(safeName)) return prev
+      return [...prev, safeName]
+    })
+
+    setSelectedContact(safeName)
+  }
+
+  const handleRemoveUser = (usernameToRemove) => {
+    setSelectedUsers((prev) => prev.filter((item) => item !== usernameToRemove))
+    setSelectedContact((prev) => (prev === usernameToRemove ? '' : prev))
+  }
+
   return (
-    <div className="chat-wrapper">
-      <UserList users={users} currentUser={username} />
-      <div className="chat-container">
-        <ChatHeader
-          usersCount={users.length}
-          isConnected={isConnected}
-          error={error}
-          currentUserLabel={`Hello, ${username}`}
+    <div className={`chat-shell theme-${theme}`}>
+      <div className="chat-wrapper">
+        <UserList
+          users={contacts}
+          availableUsers={availableUsers}
+          currentUser={username}
+          selectedContact={selectedContact}
+          onSelectContact={setSelectedContact}
+          onAddUser={handleAddUser}
+          onRemoveUser={handleRemoveUser}
           onLogout={onLogout}
+          theme={theme}
+          onToggleTheme={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
         />
 
-        <MessageList messages={messages} currentUser={username} typing={typing} />
+        <div className="chat-container">
+        <ChatHeader
+          activeContactName={activeContactName}
+          usersCount={contacts.length}
+          isConnected={isConnected}
+          error={error}
+          currentUserLabel={`Signed in as ${username}`}
+        />
 
-        <ChatInput 
-          onSendMessage={handleSendMessage}
-          onTyping={handleTyping}
-          onStopTyping={handleStopTyping}
+          <MessageList
+            messages={conversationMessages}
+            currentUser={username}
+            typing={typing}
+            hasSelectedContact={Boolean(selectedContact)}
+          />
+
+          <ChatInput
+            onSendMessage={handleSendMessage}
+            onTyping={handleTyping}
+            onStopTyping={handleStopTyping}
+            disabled={!selectedContact}
+          />
+        </div>
+
+        <ProfileSidebar
+          activeContact={selectedContactData}
+          usersCount={onlineUsers.length}
+          users={onlineUsers}
+          onLogout={onLogout}
         />
       </div>
     </div>

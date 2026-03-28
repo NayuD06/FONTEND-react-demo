@@ -22,12 +22,12 @@
 .message.other-message {
   justify-content: flex-start;
   align-items: flex-end;
-  gap: 8px;
+  gap: 10px;
 }
 
 .message.system-message {
   justify-content: center;
-  margin: 10px 0;
+  margin: 8px 0;
 }
 
 .sender-info {
@@ -38,15 +38,21 @@
 }
 
 .sender-avatar {
-  font-size: 18px;
-  min-width: 24px;
-  text-align: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #fef3de, #d09c49);
+  border: 1px solid #d7b57a;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  color: #2a221d;
 }
 
 .sender-name {
-  font-size: 12px;
-  font-weight: bold;
-  color: #666;
+  font-size: 11px;
+  font-weight: 700;
+  color: #bcc4d4;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -54,31 +60,32 @@
 }
 
 .system-text {
-  font-size: 12px;
-  color: #999;
-  font-style: italic;
-  padding: 5px 10px;
-  background: transparent;
+  font-size: 11px;
+  color: #aab3c3;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(122, 129, 148, 0.18);
 }
 
 .message-content {
-  max-width: 70%;
-  padding: 10px 12px;
-  border-radius: 10px;
+  max-width: min(70%, 520px);
+  padding: 9px 14px;
+  border-radius: 999px;
   word-wrap: break-word;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.18);
 }
 
 .message.user-message .message-content {
-  background: #0f172a;
-  color: #ffffff;
-  border-bottom-right-radius: 3px;
+  background: var(--bubble-self);
+  color: var(--bubble-self-text);
+  border-bottom-right-radius: 10px;
 }
 
 .message.other-message .message-content {
-  background: #ffffff;
-  color: #111827;
-  border: 1px solid #e5e7eb;
-  border-bottom-left-radius: 3px;
+  background: var(--bubble-other);
+  color: var(--bubble-other-text);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom-left-radius: 10px;
 }
 
 .message-content p {
@@ -89,10 +96,10 @@
 }
 
 .message-time {
-  font-size: 11px;
-  opacity: 0.6;
+  font-size: 10px;
+  opacity: 0.65;
   display: block;
-  margin-top: 6px;
+  margin-top: 5px;
 }
 
 .message.user-message .message-time {

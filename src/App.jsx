@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import AuthForm from './components/AuthForm'
 import Chat from './components/Chat'
 import {
+  deleteAuthUser,
   loginWithEmail,
   logoutUser,
   onAuthChanged,
   registerWithEmail,
 } from './services/authService'
-import { upsertUserProfile } from './services/chatApiService'
+import { checkApiReady, fetchUserProfile, upsertUserProfile } from './services/chatApiService'
+import { removeProvisionedUserAccess, setProvisionedUserAccess } from './services/firebaseService'
 import './App.css'
 
 function App() {
@@ -15,8 +17,13 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true)
   const [authError, setAuthError] = useState('')
   const [isRegisterMode, setIsRegisterMode] = useState(false)
+  const authSubmitInProgressRef = useRef(false)
 
   const toFriendlyAuthError = (error) => {
+    if (typeof error === 'string' && error.trim()) {
+      return error
+    }
+
     const code = error?.code || ''
     const message = error?.message || ''
 
@@ -44,35 +51,89 @@ function App() {
     }
 
     if (code.includes('auth/invalid-email')) return 'Email không hợp lệ.'
-    if (code.includes('auth/user-not-found')) return 'Không tìm thấy tài khoản.'
+    if (code.includes('auth/user-not-found')) {
+      return 'Tài khoản chưa được tạo. Bạn chưa thể vào trang chat.'
+    }
     if (code.includes('auth/wrong-password') || code.includes('auth/invalid-credential')) {
       return 'Email hoặc mật khẩu không đúng.'
     }
+    if (code.includes('auth/invalid-login-credentials')) {
+      return 'Email hoặc mật khẩu không đúng. Nếu tài khoản đã tạo trước đó, hãy dùng đúng mật khẩu cũ để hoàn tất đồng bộ.'
+    }
     if (code.includes('auth/email-already-in-use')) return 'Email này đã được sử dụng.'
     if (code.includes('auth/weak-password')) return 'Mật khẩu tối thiểu 6 ký tự.'
+    if (code.includes('auth/profile-not-found')) {
+      return 'Tài khoản này chưa được tạo trong hệ thống nên không thể vào trang chat.'
+    }
+    if (code.includes('auth/register-sync-failed')) {
+      return `Đăng ký chưa hoàn tất do lỗi đồng bộ dữ liệu. ${message || 'Vui lòng thử lại.'}`
+    }
 
+    if (message.includes('VITE_API_BASE_URL')) return message
+    if (message.includes('Không kết nối được API chat')) return message
+    if (message.includes('Tai khoan chua duoc cap quyen chat')) {
+      return 'Tài khoản chưa được cấp quyền chat. Vui lòng liên hệ quản trị viên.'
+    }
+
+    if (message.includes('auth/email-already-in-use')) return 'Email này đã được sử dụng.'
+    if (message.includes('auth/invalid-credential')) return 'Email hoặc mật khẩu không đúng.'
+
+    if (message) {
+      return message
+    }
+
+    const details = error && typeof error === 'object' ? JSON.stringify(error) : ''
     return code
       ? `Không thể xác thực tài khoản (${code}). Hãy kiểm tra cấu hình Firebase Authentication.`
-      : 'Không thể xác thực tài khoản. Hãy kiểm tra lại cấu hình Firebase Authentication.'
+      : details
+        ? `Không thể xác thực tài khoản. Chi tiết: ${details}`
+        : 'Không thể xác thực tài khoản. Vui lòng thử lại.'
+  }
+
+  const ensureMongoProfile = async (user) => {
+    try {
+      await fetchUserProfile(user.uid)
+      await setProvisionedUserAccess(user.uid)
+      return true
+    } catch {
+      await removeProvisionedUserAccess(user.uid).catch(() => {})
+      await logoutUser()
+      const profileError = new Error('Mongo profile not found')
+      profileError.code = 'auth/profile-not-found'
+      throw profileError
+    }
+  }
+
+  const isEmailAlreadyInUseError = (error) => {
+    const code = error?.code || ''
+    const message = error?.message || ''
+    return (
+      code.includes('auth/email-already-in-use') ||
+      message.includes('auth/email-already-in-use')
+    )
   }
 
   useEffect(() => {
     const unsubscribe = onAuthChanged(async (user) => {
-      setCurrentUser(user)
-      setAuthLoading(false)
+      if (authSubmitInProgressRef.current) {
+        return
+      }
 
-      if (!user) return
+      if (!user) {
+        setCurrentUser(null)
+        setAuthLoading(false)
+        return
+      }
 
       try {
-        await upsertUserProfile({
-          firebaseUid: user.uid,
-          email: user.email || '',
-          displayName: user.displayName || '',
-          photoURL: user.photoURL || '',
-        })
+        await ensureMongoProfile(user)
+        setCurrentUser(user)
         setAuthError('')
-      } catch {
-        setAuthError('Đăng nhập thành công nhưng chưa lưu được hồ sơ user vào MongoDB.')
+      } catch (error) {
+        setCurrentUser(null)
+        setAuthError(toFriendlyAuthError(error))
+      } finally {
+        setAuthLoading(false)
       }
     })
 
@@ -83,14 +144,64 @@ function App() {
 
   const handleAuthSubmit = async ({ email, password, displayName }) => {
     setAuthError('')
+    authSubmitInProgressRef.current = true
+    let createdUser = null
+
     try {
+      await checkApiReady()
+
       if (isRegisterMode) {
-        await registerWithEmail(email, password, displayName)
+        let credential
+
+        try {
+          credential = await registerWithEmail(email, password, displayName)
+          createdUser = credential.user
+        } catch (registerError) {
+          if (!isEmailAlreadyInUseError(registerError)) {
+            throw registerError
+          }
+
+          // Recover from partial registrations where Auth user exists but Mongo profile is missing.
+          try {
+            credential = await loginWithEmail(email, password)
+          } catch (loginError) {
+            const recoverError = new Error(
+              'Email đã tồn tại trên Firebase. Hãy nhập đúng mật khẩu đã tạo trước đó để hệ thống tự đồng bộ MongoDB.'
+            )
+            recoverError.code = loginError?.code || 'auth/invalid-login-credentials'
+            throw recoverError
+          }
+        }
+
+        await upsertUserProfile({
+          firebaseUid: credential.user.uid,
+          email: credential.user.email || email || '',
+          displayName: credential.user.displayName || displayName?.trim() || '',
+          photoURL: credential.user.photoURL || '',
+        })
+        await setProvisionedUserAccess(credential.user.uid)
+        setCurrentUser(credential.user)
       } else {
-        await loginWithEmail(email, password)
+        const credential = await loginWithEmail(email, password)
+        await ensureMongoProfile(credential.user)
+        setCurrentUser(credential.user)
       }
     } catch (error) {
+      if (isRegisterMode && createdUser) {
+        await removeProvisionedUserAccess(createdUser.uid).catch(() => {})
+        await deleteAuthUser(createdUser).catch(() => logoutUser().catch(() => {}))
+
+        const syncError = new Error(error?.message || 'Loi dong bo user profile')
+        syncError.code = error?.code || 'auth/register-sync-failed'
+        setAuthError(toFriendlyAuthError(syncError))
+        return
+      }
+
+      setCurrentUser(null)
       setAuthError(toFriendlyAuthError(error))
+    } finally {
+      authSubmitInProgressRef.current = false
+      setAuthLoading(false)
     }
   }
 
@@ -121,6 +232,7 @@ function App() {
           setIsRegisterMode((prev) => !prev)
         }}
         error={authError}
+        isAccountMissing={authError.includes('chưa được tạo')}
       />
     )
   }

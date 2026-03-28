@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import './ChatInput.css'
 
-export default function ChatInput({ onSendMessage, onTyping, onStopTyping }) {
+export default function ChatInput({ onSendMessage, onTyping, onStopTyping, disabled = false }) {
   const [input, setInput] = useState('')
 
   const handleSend = () => {
+    if (disabled) return
+
     if (input.trim()) {
       onSendMessage(input)
       setInput('')
@@ -21,29 +23,37 @@ export default function ChatInput({ onSendMessage, onTyping, onStopTyping }) {
 
   const handleChange = (e) => {
     setInput(e.target.value)
-    if (onTyping && e.target.value.trim()) {
+    if (!disabled && onTyping && e.target.value.trim()) {
       onTyping()
     }
   }
 
   return (
     <div className="chat-input-container">
-      <textarea
+      <button type="button" className="composer-tool" aria-label="Voice note">
+        ☺
+      </button>
+
+      <input
         value={input}
         onChange={handleChange}
         onKeyDown={handleKeyPress}
         onBlur={() => onStopTyping && onStopTyping()}
-        placeholder="Type your message here..."
+        placeholder={disabled ? 'Select a user to chat' : 'Message........'}
         className="chat-input"
-        rows="3"
+        disabled={disabled}
       />
-      <button 
-        onClick={handleSend}
-        className="send-button"
-        disabled={!input.trim()}
-      >
-        <span>Send</span>
-        <span className="send-icon">→</span>
+
+      <button type="button" className="composer-tool" aria-label="Attach file">
+        📎
+      </button>
+
+      <button type="button" className="composer-tool" aria-label="Open sticker panel">
+        🖼
+      </button>
+
+      <button onClick={handleSend} className="send-button" disabled={disabled || !input.trim()} type="button">
+        ➤
       </button>
     </div>
   )

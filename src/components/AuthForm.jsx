@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import './AuthForm.css'
 
-export default function AuthForm({ isRegisterMode, onSubmit, onToggleMode, error }) {
+export default function AuthForm({ isRegisterMode, onSubmit, onToggleMode, error, isAccountMissing = false }) {
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -102,6 +102,11 @@ export default function AuthForm({ isRegisterMode, onSubmit, onToggleMode, error
 
         {localError && <p className="auth-error">{localError}</p>}
         {error && <p className="auth-error">{error}</p>}
+        {isAccountMissing && (
+          <div className="auth-warning" role="alert">
+            Tài khoản chưa được tạo nên hệ thống sẽ không cho vào trang chat.
+          </div>
+        )}
 
         <button type="button" className="auth-toggle" onClick={onToggleMode}>
           {isRegisterMode ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký'}

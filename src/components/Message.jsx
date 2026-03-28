@@ -1,5 +1,11 @@
 import './Message.css'
 
+const getInitials = (name = '') => {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  if (!words.length) return 'U'
+  return words.slice(0, 2).map((word) => word[0]?.toUpperCase() || '').join('')
+}
+
 export default function Message({ message, currentUser }) {
   const isSystem = message.isSystem
   
@@ -25,7 +31,7 @@ export default function Message({ message, currentUser }) {
     <div className={`message ${isCurrentUser ? 'user-message' : 'other-message'}`}>
       {!isCurrentUser && (
         <div className="sender-info">
-          <span className="sender-avatar">👤</span>
+          <span className="sender-avatar">{getInitials(message.username)}</span>
           <span className="sender-name">{message.username}</span>
         </div>
       )}

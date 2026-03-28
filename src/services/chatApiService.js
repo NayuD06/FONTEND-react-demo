@@ -112,3 +112,11 @@ export const upsertUserProfile = ({ firebaseUid, email, displayName, photoURL })
 export const fetchUserProfile = (firebaseUid) => {
   return request(`/api/user-profiles/${firebaseUid}`)
 }
+
+export const fetchAllUserProfiles = () => {
+  return request('/api/user-profiles')
+}
+
+export const checkApiReady = () => {
+  return request('/api/health')
+}

@@ -1,6 +1,7 @@
 import {
   browserLocalPersistence,
   createUserWithEmailAndPassword,
+  deleteUser,
   getAuth,
   onAuthStateChanged,
   setPersistence,
@@ -60,4 +61,9 @@ export const registerWithEmail = async (email, password, displayName) => {
 export const logoutUser = () => {
   const auth = getFirebaseAuth()
   return signOut(auth)
+}
+
+export const deleteAuthUser = (user) => {
+  if (!user) return Promise.resolve()
+  return deleteUser(user)
 }

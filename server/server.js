@@ -142,6 +142,32 @@ app.get('/api/user-profiles/:firebaseUid', async (req, res) => {
   }
 })
 
+app.get('/api/user-profiles', async (req, res) => {
+  try {
+    const docs = await UserProfile.find({})
+      .sort({ lastLoginAt: -1, createdAt: -1 })
+      .lean()
+
+    const profiles = docs.map((doc) => ({
+      id: doc._id.toString(),
+      firebaseUid: doc.firebaseUid,
+      email: doc.email,
+      displayName: doc.displayName,
+      photoURL: doc.photoURL,
+      lastLoginAt: doc.lastLoginAt,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
+    }))
+
+    return res.json(profiles)
+  } catch (error) {
+    return res.status(500).json({
+      message: 'Khong the lay danh sach user profiles.',
+      detail: error.message,
+    })
+  }
+})
+
 app.get('/api/messages', async (req, res) => {
   try {
     const limit = Number.parseInt(req.query.limit, 10) || 50
