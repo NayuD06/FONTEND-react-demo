@@ -8,7 +8,7 @@ import {
   onAuthChanged,
   registerWithEmail,
 } from './services/authService'
-import { checkApiReady, fetchUserProfile, upsertUserProfile } from './services/chatApiService'
+import { fetchUserProfile, upsertUserProfile } from './services/chatApiService'
 import { removeProvisionedUserAccess, setProvisionedUserAccess } from './services/firebaseService'
 import './App.css'
 
@@ -24,8 +24,12 @@ function App() {
       return error
     }
 
-    const code = error?.code || ''
+    const rawCode = error?.code || ''
     const message = error?.message || ''
+    const extractedCode = typeof message === 'string'
+      ? (message.match(/auth\/[a-z0-9-]+/i)?.[0] || '')
+      : ''
+    const code = (rawCode || extractedCode).toLowerCase()
 
     if (message.includes('Cau hinh Firebase chua day du')) {
       return message
@@ -87,7 +91,7 @@ function App() {
       ? `Không thể xác thực tài khoản (${code}). Hãy kiểm tra cấu hình Firebase Authentication.`
       : details
         ? `Không thể xác thực tài khoản. Chi tiết: ${details}`
-        : 'Không thể xác thực tài khoản. Vui lòng thử lại.'
+        : 'Không thể xác thực tài khoản do lỗi không xác định. Vui lòng thử lại sau vài giây.'
   }
 
   const ensureMongoProfile = async (user) => {
@@ -95,13 +99,31 @@ function App() {
       await fetchUserProfile(user.uid)
       await setProvisionedUserAccess(user.uid)
       return true
-    } catch {
+    } catch (error) {
+      const message = error?.message || ''
+      const backendUnavailable =
+        message.includes('VITE_API_BASE_URL') ||
+        message.includes('Không kết nối được API chat')
+
+      if (backendUnavailable) {
+        await setProvisionedUserAccess(user.uid)
+        return true
+      }
+
       await removeProvisionedUserAccess(user.uid).catch(() => {})
       await logoutUser()
       const profileError = new Error('Mongo profile not found')
       profileError.code = 'auth/profile-not-found'
       throw profileError
     }
+  }
+
+  const isBackendUnavailableError = (error) => {
+    const message = error?.message || ''
+    return (
+      message.includes('VITE_API_BASE_URL') ||
+      message.includes('Không kết nối được API chat')
+    )
   }
 
   const isEmailAlreadyInUseError = (error) => {
@@ -116,6 +138,16 @@ function App() {
   useEffect(() => {
     const unsubscribe = onAuthChanged(async (user) => {
       if (authSubmitInProgressRef.current) {
+        return
+      }
+
+      const logoutReason = localStorage.getItem('chatLogoutReason') || ''
+      if (user && logoutReason) {
+        localStorage.removeItem('chatLogoutReason')
+        await logoutUser().catch(() => {})
+        setCurrentUser(null)
+        setAuthError(logoutReason)
+        setAuthLoading(false)
         return
       }
 
@@ -148,8 +180,6 @@ function App() {
     let createdUser = null
 
     try {
-      await checkApiReady()
-
       if (isRegisterMode) {
         let credential
 
@@ -173,12 +203,19 @@ function App() {
           }
         }
 
-        await upsertUserProfile({
-          firebaseUid: credential.user.uid,
-          email: credential.user.email || email || '',
-          displayName: credential.user.displayName || displayName?.trim() || '',
-          photoURL: credential.user.photoURL || '',
-        })
+        try {
+          await upsertUserProfile({
+            firebaseUid: credential.user.uid,
+            email: credential.user.email || email || '',
+            displayName: credential.user.displayName || displayName?.trim() || '',
+            photoURL: credential.user.photoURL || '',
+          })
+        } catch (profileError) {
+          if (!isBackendUnavailableError(profileError)) {
+            throw profileError
+          }
+        }
+
         await setProvisionedUserAccess(credential.user.uid)
         setCurrentUser(credential.user)
       } else {
@@ -187,7 +224,7 @@ function App() {
         setCurrentUser(credential.user)
       }
     } catch (error) {
-      if (isRegisterMode && createdUser) {
+      if (isRegisterMode && createdUser && !isBackendUnavailableError(error)) {
         await removeProvisionedUserAccess(createdUser.uid).catch(() => {})
         await deleteAuthUser(createdUser).catch(() => logoutUser().catch(() => {}))
 
@@ -205,10 +242,11 @@ function App() {
     }
   }
 
-  const handleLogout = async () => {
+  const handleLogout = async (reason = 'Bạn đã đăng xuất và quay về trang đăng nhập.') => {
     setAuthError('')
     try {
       await logoutUser()
+      setAuthError(reason)
     } catch (error) {
       setAuthError(toFriendlyAuthError(error))
     }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import ChatHeader from './ChatHeader'
 import MessageList from './MessageList'
 import ChatInput from './ChatInput'
@@ -9,12 +9,11 @@ import {
   getFirebaseConfigError,
   listenToMessages,
   listenToUsers,
-  ONLINE_TTL_MS,
   removeUser,
   sendMessage,
   touchUserActivity,
 } from '../services/firebaseService'
-import { fetchAllUserProfiles } from '../services/chatApiService'
+import { fetchAllUserProfiles, sendChatMessage } from '../services/chatApiService'
 import './Chat.css'
 
 const resolveTheme = () => {
@@ -37,7 +36,6 @@ export default function Chat({ currentUser, onLogout, authError }) {
   const [theme, setTheme] = useState(resolveTheme)
   const [isConnected, setIsConnected] = useState(false)
   const [connectionError, setConnectionError] = useState('')
-  const isLoggingOutRef = useRef(false)
 
   const currentUserId = currentUser?.uid || ''
   const username = toSafeText(
@@ -263,33 +261,23 @@ export default function Chat({ currentUser, onLogout, authError }) {
   useEffect(() => {
     if (!currentUserId) return
 
-    let timeoutId = null
     let heartbeatId = null
-
-    const handleAutoLogout = async () => {
-      if (isLoggingOutRef.current) return
-      isLoggingOutRef.current = true
-      await onLogout()
-    }
-
-    const resetInactivityTimer = () => {
-      if (timeoutId) {
-        window.clearTimeout(timeoutId)
-      }
-      timeoutId = window.setTimeout(() => {
-        handleAutoLogout().catch(() => {})
-      }, ONLINE_TTL_MS)
-    }
 
     const markActivity = () => {
       touchUserActivity(currentUserId).catch(() => {})
-      resetInactivityTimer()
+    }
+
+    const markLogoutOnPageExit = () => {
+      localStorage.setItem('chatLogoutReason', 'Bạn đã đăng xuất vì rời khỏi trang web.')
     }
 
     const activityEvents = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click']
     activityEvents.forEach((eventName) => {
       window.addEventListener(eventName, markActivity, { passive: true })
     })
+
+    window.addEventListener('beforeunload', markLogoutOnPageExit)
+    window.addEventListener('pagehide', markLogoutOnPageExit)
 
     const handleVisibilityChange = () => {
       if (!document.hidden) {
@@ -298,21 +286,21 @@ export default function Chat({ currentUser, onLogout, authError }) {
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
-    resetInactivityTimer()
+    markActivity()
     heartbeatId = window.setInterval(() => {
       touchUserActivity(currentUserId).catch(() => {})
     }, 60 * 1000)
 
     return () => {
-      if (timeoutId) window.clearTimeout(timeoutId)
       if (heartbeatId) window.clearInterval(heartbeatId)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('beforeunload', markLogoutOnPageExit)
+      window.removeEventListener('pagehide', markLogoutOnPageExit)
       activityEvents.forEach((eventName) => {
         window.removeEventListener(eventName, markActivity)
       })
-      isLoggingOutRef.current = false
     }
-  }, [currentUserId, onLogout, username])
+  }, [currentUserId, username])
 
   const handleSendMessage = async (text) => {
     if (!selectedContact) return
@@ -323,6 +311,22 @@ export default function Chat({ currentUser, onLogout, authError }) {
       } catch (err) {
         setConnectionError(toFriendlyError(err))
         setIsConnected(false)
+        return
+      }
+
+      try {
+        // Best-effort Mongo sync. Never break realtime chat delivery when API is missing.
+        await sendChatMessage(username, text)
+      } catch (err) {
+        const message = err?.message || ''
+        const backendUnavailable =
+          message.includes('VITE_API_BASE_URL') ||
+          message.includes('Không kết nối được API chat') ||
+          message.includes('localhost')
+
+        if (!backendUnavailable) {
+          setConnectionError(`Đã gửi realtime nhưng chưa lưu Mongo: ${message}`)
+        }
       }
     }
   }
